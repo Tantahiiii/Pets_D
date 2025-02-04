@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, AlertCircle, CheckCircle2, History, Clock } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
-import { collection, addDoc, query, orderBy, getDocs, doc } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, getDocs,doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { DetectionResult } from '../types';
 import toast from 'react-hot-toast';
@@ -31,27 +31,35 @@ export function ImageDetection() {
     }
   }, [user]);
 
-  const loadPredictionHistory = async () => {
-    if (!user) return;
+  
+ const loadPredictionHistory = async () => {
+  if (!user) {
+    console.log("❌ No user logged in");
+    return;
+  }
 
-    try {
-      // ดึง Prediction History ของผู้ใช้จาก Firestore
-     const predictionsRef = collection(doc(db, 'users', user.uid), 'predictions');
-     const q = query(predictionsRef, orderBy('timestamp', 'desc'));
+  try {
+    console.log("✅ Fetching predictions for user:", user.uid);
+    
+    const predictionsRef = collection(doc(db, 'users', user.uid), 'predictions');
+    const q = query(predictionsRef, orderBy('timestamp', 'desc'));
 
-      const querySnapshot = await getDocs(q);
-      const history: PredictionHistory[] = [];
+    const querySnapshot = await getDocs(q);
+    const history: PredictionHistory[] = [];
 
-      querySnapshot.forEach((doc) => {
-        history.push({ id: doc.id, ...doc.data() } as PredictionHistory);
-      });
+    querySnapshot.forEach((doc) => {
+      history.push({ id: doc.id, ...doc.data() } as PredictionHistory);
+    });
 
-      setPredictions(history);
-    } catch (err) {
-      console.error('Error loading prediction history:', err);
-      toast.error('Failed to load prediction history');
-    }
-  };
+    setPredictions(history);
+    console.log("✅ Prediction history loaded:", history);
+  } catch (err: any) {
+    console.error('❌ Error loading prediction history:', err.message, err.code, err);
+    toast.error(`Failed to load prediction history: ${err.message}`);
+  }
+};
+
+
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -88,23 +96,24 @@ export function ImageDetection() {
     setError(null);
 
     try {
-      // อัปโหลดรูปภาพไปที่ Firebase Storage
+      // Upload image to Firebase Storage
       const imageRef = ref(storage, `predictions/${user.uid}/${Date.now()}_${selectedImage.name}`);
       await uploadBytes(imageRef, selectedImage);
       const imageUrl = await getDownloadURL(imageRef);
 
-      // Mock API call - แทนที่ด้วย API จริงในอนาคต
+      // Mock API call - replace with actual API in the future
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // ผลลัพธ์ตัวอย่าง
+      // Sample result
       const mockResult = {
         confidence: 0.92,
         predictedClass: 'Grasshopper',
         timestamp: new Date().toISOString(),
       };
 
-      // บันทึกผลลง Firestore ใน Subcollection `predictions` ของ `userId`
-      await addDoc(collection(doc(db, 'users', user.uid), 'predictions'), {
+      // Save prediction to Firestore
+      const predictionsRef = collection(db, 'users', user.uid, 'predictions');
+      await addDoc(predictionsRef, {
         imageName: selectedImage.name,
         imageUrl: imageUrl,
         ...mockResult
@@ -116,14 +125,15 @@ export function ImageDetection() {
         created_at: mockResult.timestamp
       });
 
-      // รีเซ็ตฟอร์ม
+      // Reset form
       setSelectedImage(null);
       setPreview(null);
 
-      // โหลดประวัติใหม่
+      // Reload prediction history
       await loadPredictionHistory();
       toast.success('Prediction saved successfully');
     } catch (err) {
+      console.error('Error processing image:', err);
       setError('Failed to process image. Please try again.');
       toast.error('Failed to process image');
     } finally {
@@ -203,6 +213,39 @@ export function ImageDetection() {
             {isUploading ? 'Processing...' : 'Detect Pest'}
           </button>
         </form>
+
+        {/* Prediction History */}
+        {predictions.length > 0 && (
+          <div className="mt-8 border-t pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <History className="h-5 w-5 text-gray-600" />
+              <h2 className="text-lg font-semibold text-gray-900">Recent Predictions</h2>
+            </div>
+            <div className="space-y-4">
+              {predictions.map((prediction) => (
+                <div key={prediction.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
+                  {prediction.imageUrl && (
+                    <img
+                      src={prediction.imageUrl}
+                      alt={prediction.predictedClass}
+                      className="w-20 h-20 object-cover rounded-lg"
+                    />
+                  )}
+                  <div>
+                    <p className="font-medium text-gray-900">{prediction.predictedClass}</p>
+                    <p className="text-sm text-gray-500">
+                      Confidence: {(prediction.confidence * 100).toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+                      <Clock className="h-3 w-3" />
+                      {new Date(prediction.timestamp).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

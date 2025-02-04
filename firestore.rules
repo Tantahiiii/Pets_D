@@ -1,15 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // อนุญาตให้ user ที่ login เข้าถึงเฉพาะข้อมูลของตัวเอง
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-
-      // อนุญาตให้ list ข้อมูลจาก predictions
-      match /users/{userId}/predictions/{document=**} {
-        allow read, write, list: if request.auth != null && request.auth.uid == userId;
-      }
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
