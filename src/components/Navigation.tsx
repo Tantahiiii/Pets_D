@@ -1,7 +1,8 @@
 import React from 'react';
 import { Bug, Home, Upload, UserCircle, BookOpen, LogOut, User } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
-import { supabase } from '../lib/supabase';
+import { auth } from '../lib/firebase';
+import { signOut } from 'firebase/auth';
 import toast from 'react-hot-toast';
 
 export function Navigation() {
@@ -10,7 +11,7 @@ export function Navigation() {
 
   const handleLogout = async () => {
     try {
-      await supabase?.auth.signOut();
+      await signOut(auth);
       toast.success('Logged out successfully');
       window.location.href = '/';
     } catch (error) {
@@ -56,7 +57,7 @@ export function Navigation() {
                   className="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                 >
                   <User className="h-4 w-4 mr-2" />
-                  Profile
+                  {user.displayName || 'Profile'}
                 </a>
                 <button
                   onClick={handleLogout}
@@ -130,7 +131,7 @@ export function Navigation() {
                 className="flex items-center px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100"
               >
                 <User className="h-5 w-5 mr-2" />
-                Profile
+                {user.displayName || 'Profile'}
               </a>
               <button
                 onClick={handleLogout}
