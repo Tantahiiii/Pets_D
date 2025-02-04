@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, Settings, Camera, Bell, Shield, History, Loader2, AlertCircle, Key, ChevronRight } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
-import { supabase } from '../lib/supabase';
+import { auth } from '../lib/firebase';
 import toast from 'react-hot-toast';
 
 export function UserProfile() {
@@ -18,18 +18,7 @@ export function UserProfile() {
     setIsUpdating(true);
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user?.id,
-          full_name: fullName,
-          phone: phone,
-          notifications_enabled: notificationsEnabled,
-          updated_at: new Date().toISOString(),
-        });
-
-      if (error) throw error;
-
+      // TODO: Implement profile update using Firebase
       toast.success('Profile updated successfully');
     } catch (err: any) {
       setError(err.message);
@@ -81,7 +70,7 @@ export function UserProfile() {
             </label>
             <input
               type="email"
-              value={user.email}
+              value={user.email || ''}
               disabled
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
             />

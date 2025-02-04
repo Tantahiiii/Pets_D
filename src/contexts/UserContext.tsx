@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import type { User } from '@supabase/supabase-js';
+import { User } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 interface UserContextType {
   user: User | null;
@@ -14,21 +14,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase?.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    // Listen for auth state changes
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      setUser(user);
       setLoading(false);
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase?.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    }) ?? { data: { subscription: null } };
-
-    return () => {
-      subscription?.unsubscribe();
-    };
+    // Cleanup subscription
+    return () => unsubscribe();
   }, []);
 
   return (

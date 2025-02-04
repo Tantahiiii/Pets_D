@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { KeyRound, Mail, AlertCircle, Loader2, Settings } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { KeyRound, Mail, AlertCircle, Loader2 } from 'lucide-react';
+import { auth } from '../lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import toast from 'react-hot-toast';
 
 export function Login() {
@@ -9,35 +10,13 @@ export function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!supabase) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full text-center">
-          <Settings className="mx-auto h-12 w-12 text-gray-400 animate-spin" />
-          <h2 className="mt-6 text-xl font-semibold text-gray-900">
-            Supabase Configuration Required
-          </h2>
-          <p className="mt-2 text-gray-600">
-            Please click the "Connect to Supabase" button in the top right to set up authentication.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
+      await signInWithEmailAndPassword(auth, email, password);
       toast.success('Welcome back!');
       window.location.href = '/';
     } catch (err: any) {
