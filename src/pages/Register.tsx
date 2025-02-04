@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { KeyRound, Mail, User, AlertCircle, Loader2 } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 export function Register() {
@@ -29,10 +30,27 @@ export function Register() {
     setIsLoading(true);
 
     try {
+      // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, {
+      const user = userCredential.user;
+
+      // Update user profile with username
+      await updateProfile(user, {
         displayName: username
       });
+
+      // Initialize Firestore
+      const db = getFirestore();
+
+      // Add user to Firestore users collection
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        email: user.email,
+        username: username,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
       toast.success('Registration successful!');
       window.location.href = '/';
     } catch (err: any) {

@@ -1,13 +1,57 @@
-import React, { useState } from 'react';
-import { Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Upload, AlertCircle, CheckCircle2, History, Clock } from 'lucide-react';
+import { useUser } from '../contexts/UserContext';
+import { collection, addDoc, query, orderBy, getDocs, doc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { DetectionResult } from '../types';
+import toast from 'react-hot-toast';
+import { db, storage } from '../lib/firebase';
+
+interface PredictionHistory {
+  id: string;
+  confidence: number;
+  imageName: string;
+  predictedClass: string;
+  timestamp: string;
+  imageUrl?: string;
+}
 
 export function ImageDetection() {
+  const { user } = useUser();
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DetectionResult | null>(null);
+  const [predictions, setPredictions] = useState<PredictionHistory[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      loadPredictionHistory();
+    }
+  }, [user]);
+
+  const loadPredictionHistory = async () => {
+    if (!user) return;
+
+    try {
+      // ดึง Prediction History ของผู้ใช้จาก Firestore
+     const predictionsRef = collection(doc(db, 'users', user.uid), 'predictions');
+     const q = query(predictionsRef, orderBy('timestamp', 'desc'));
+
+      const querySnapshot = await getDocs(q);
+      const history: PredictionHistory[] = [];
+
+      querySnapshot.forEach((doc) => {
+        history.push({ id: doc.id, ...doc.data() } as PredictionHistory);
+      });
+
+      setPredictions(history);
+    } catch (err) {
+      console.error('Error loading prediction history:', err);
+      toast.error('Failed to load prediction history');
+    }
+  };
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -38,23 +82,50 @@ export function ImageDetection() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selectedImage) return;
+    if (!selectedImage || !user) return;
 
     setIsUploading(true);
     setError(null);
 
     try {
-      // Mock API call - replace with actual detection API
+      // อัปโหลดรูปภาพไปที่ Firebase Storage
+      const imageRef = ref(storage, `predictions/${user.uid}/${Date.now()}_${selectedImage.name}`);
+      await uploadBytes(imageRef, selectedImage);
+      const imageUrl = await getDownloadURL(imageRef);
+
+      // Mock API call - แทนที่ด้วย API จริงในอนาคต
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock result
+
+      // ผลลัพธ์ตัวอย่าง
+      const mockResult = {
+        confidence: 0.92,
+        predictedClass: 'Grasshopper',
+        timestamp: new Date().toISOString(),
+      };
+
+      // บันทึกผลลง Firestore ใน Subcollection `predictions` ของ `userId`
+      await addDoc(collection(doc(db, 'users', user.uid), 'predictions'), {
+        imageName: selectedImage.name,
+        imageUrl: imageUrl,
+        ...mockResult
+      });
+
       setResult({
         pest_id: 'mock-pest-1',
-        confidence: 0.89,
-        created_at: new Date().toISOString()
+        confidence: mockResult.confidence,
+        created_at: mockResult.timestamp
       });
+
+      // รีเซ็ตฟอร์ม
+      setSelectedImage(null);
+      setPreview(null);
+
+      // โหลดประวัติใหม่
+      await loadPredictionHistory();
+      toast.success('Prediction saved successfully');
     } catch (err) {
       setError('Failed to process image. Please try again.');
+      toast.error('Failed to process image');
     } finally {
       setIsUploading(false);
     }
@@ -120,7 +191,7 @@ export function ImageDetection() {
 
           <button
             type="submit"
-            disabled={!selectedImage || isUploading}
+            disabled={!selectedImage || isUploading || !user}
             className={`
               w-full py-3 px-4 rounded-md text-white font-medium
               ${isUploading
@@ -132,54 +203,6 @@ export function ImageDetection() {
             {isUploading ? 'Processing...' : 'Detect Pest'}
           </button>
         </form>
-
-        {result && (
-          <div className="mt-8 p-4 bg-green-50 rounded-lg">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0 mt-1" />
-              <div>
-                <h3 className="font-semibold text-green-900">
-                  Detection Complete
-                </h3>
-                <p className="text-green-700 mt-1">
-                  We've identified the pest with {(result.confidence * 100).toFixed(1)}% confidence.
-                </p>
-                <div className="mt-4">
-                  <a
-                    href={`/pests/${result.pest_id}`}
-                    className="text-green-600 hover:text-green-700 font-medium"
-                  >
-                    View Detailed Information →
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-8 bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Tips for Better Results
-        </h2>
-        <ul className="space-y-3 text-gray-600">
-          <li className="flex items-center gap-2">
-            <div className="h-2 w-2 bg-green-500 rounded-full" />
-            Ensure the pest is clearly visible in the image
-          </li>
-          <li className="flex items-center gap-2">
-            <div className="h-2 w-2 bg-green-500 rounded-full" />
-            Use good lighting conditions
-          </li>
-          <li className="flex items-center gap-2">
-            <div className="h-2 w-2 bg-green-500 rounded-full" />
-            Take close-up shots when possible
-          </li>
-          <li className="flex items-center gap-2">
-            <div className="h-2 w-2 bg-green-500 rounded-full" />
-            Include multiple angles if unsure
-          </li>
-        </ul>
       </div>
     </div>
   );
